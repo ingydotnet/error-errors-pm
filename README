@@ -1,0 +1,35 @@
+NAME
+    errors - Error Handling for Perl
+
+STATUS
+    This module is still being designed. Don't use it yet.
+
+SYNOPSIS
+        use errors;
+
+        try {
+            raise Error("Something is not cool")
+                if $uncool;
+        }
+        except {
+            warn $_;
+        }
+        finally {
+            cleanup();
+        };
+
+DESCRIPTION
+    Yet another attempt to add clean, sane, flexible and usable error
+    handling to Perl.
+
+AUTHOR
+    Ingy döt Net <ingy@cpan.org>
+
+COPYRIGHT
+    Copyright (c) 2009. Ingy döt Net.
+
+    This program is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
+    See http://www.perl.com/perl/misc/Artistic.html
+
