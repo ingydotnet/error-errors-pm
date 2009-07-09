@@ -2,25 +2,36 @@ NAME
     errors - Error Handling for Perl
 
 STATUS
-    This module is still being designed. Don't use it yet.
+    This module is still under design. Don't use it in production yet.
 
 SYNOPSIS
+        use strict;
+        use warnings;
         use errors;
 
         try {
-            raise Error("Something is not cool")
+            throw Error("Something is not cool")
                 if $uncool;
         }
+        catch Error with {
+            my $e = shift;
+            warn $e;
+        }
         except {
-            warn $_;
+            my $e = shift;
+            print "Some other error: $e";
         }
         finally {
             cleanup();
         };
 
 DESCRIPTION
-    Yet another attempt to add clean, sane, flexible and usable error
+    The "error" module adds clean, simple, sane, flexible and usable error
     handling to Perl.
+
+    Currently it is almost an exact proxy for Error.pm. It gets rid of the
+    Error::Simple base class, and allows you to use 'Error' as the top base
+    class.
 
 AUTHOR
     Ingy döt Net <ingy@cpan.org>

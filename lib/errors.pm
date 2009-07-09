@@ -1,89 +1,42 @@
 package errors;
 use strict;
 use 5.008;
-our $VERSION = '0.01';
-# $YAML::UseCode = 1;
-# use XXX;
+our $VERSION = '0.02';
+use Error 0.17015;
+use Error::Simple();
 
-package Error;
-use overload (
-    '""'       =>   'stringify',
-    '0+'       =>   'value',
-    'bool'     =>   sub { return 1; },
-    'fallback' =>   1
-);
-
-sub stringify {
-    my $self = shift;
-    return $self->{value};
-}
-
-sub value {
-    my $self = shift;
-    return $self->{value};
-}
-
-package errors;
-my @stack = [];
+# use XXX; $YAML::UseCode = 1;
 
 sub import {
     my ($class, $arg1) = @_;
     my ($package, $module) = caller(0);
     die "'use Errors' does not accept any arguments" if $arg1;
-    {
-        no strict 'refs';
-        *{$package . "::raise"} = \&raise;
-        *{$package . "::try"} = \&try;
-        *{$package . "::except"} = \&except;
-        *{$package . "::finally"} = \&finally;
-        *{$package . "::Error"} = \&Error;
-    }
+    local $Exporter::ExportLevel = $Exporter::ExportLevel + 1;
+    Error::subs->import(':try');
 }
 
-sub Error {
-    my $value = shift;
-    return bless {
-        value => $value,
-    }, 'Error';
-}
+{
+    no warnings 'redefine';
+    # This function is modified from Error.pm
+    sub Error::throw {
+        my $self = shift;
+        local $Error::Depth = $Error::Depth + 1;
 
-sub raise {
-    my $error = shift;
-    die $error;
-}
-
-sub try(&;@) {
-    my $code = shift;
-    my $error;
-    eval { &$code };
-    if ($@) {
-        $error = ref($@) ? $@ : Error($@);
-    }
-    for my $clause (@_) {
-        if ($error and defined ($clause->{except})) {
-            my $code = $clause->{except};
-            $_ = $error;
-            eval &$code;
-            if ($@) {
-                $error = ref($@) ? $@ : Error($@);
+        # if we are not rethrow-ing then create the object to throw
+        unless (ref($self)) {
+            my @args = @_;
+            if ($self eq 'Error') {
+                @args = (-text => $args[0], -value => $args[1]);
             }
+            $self = $self->new(@args);
         }
-        elsif (defined $clause->{finally}) {
-            my $code = $clause->{finally};
-            $_ = $error;
-            eval &$code;
-        }
+        die $Error::THROWN = $self;
     }
-}
 
-sub except(&;@) {
-    my $code = shift;
-    return { except => $code }, @_;
-}
-
-sub finally(&) {
-    my $code = shift;
-    return { finally => $code };
+    # Eliminate Error::Simple usage
+    sub Error::Simple::new {
+        die "Use 'Error' instead of 'Error::Simple'.";
+    }
 }
 
 1;
@@ -96,18 +49,25 @@ errors - Error Handling for Perl
 
 =head1 STATUS
 
-This module is still being designed. Don't use it yet.
+This module is still under design. Don't use it in production yet.
 
 =head1 SYNOPSIS
 
+    use strict;
+    use warnings;
     use errors;
 
     try {
-        raise Error("Something is not cool")
+        throw Error("Something is not cool")
             if $uncool;
     }
+    catch Error with {
+        my $e = shift;
+        warn $e;
+    }
     except {
-        warn $_;
+        my $e = shift;
+        print "Some other error: $e";
     }
     finally {
         cleanup();
@@ -115,8 +75,12 @@ This module is still being designed. Don't use it yet.
 
 =head1 DESCRIPTION
 
-Yet another attempt to add clean, sane, flexible and usable error
+The C<error> module adds clean, simple, sane, flexible and usable error
 handling to Perl.
+
+Currently it is almost an exact proxy for Error.pm. It gets rid of the
+Error::Simple base class, and allows you to use 'Error' as the top
+base class.
 
 =head1 AUTHOR
 
