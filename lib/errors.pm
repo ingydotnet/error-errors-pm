@@ -1,7 +1,20 @@
+# == ToDo
+# - Support $_ as error topic
+# - 'with' clashes with Moose
+# - Add system error classes
+# - Support autodie
+# - Move Error.pm code into module
+# 
+# == Tests
+# - nesting of try stuff
+# - otherwise
+# - except
+# - assert
+# - -with_using
 package errors;
 use strict;
 use 5.008;
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 use Error 0.17015;
 use Error::Simple();
 
