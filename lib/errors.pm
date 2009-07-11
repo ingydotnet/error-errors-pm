@@ -1,27 +1,28 @@
 # == ToDo
-# - Support $_ as error topic
-# - 'with' clashes with Moose
+# + Move Error.pm code into module
+# + 'with' clashes with Moose
+# + Remove Simple
+# + Support $_ as error topic
+#
 # - Add system error classes
 # - Support autodie
-# - Move Error.pm code into module
+# - Move most Error stuff into errors package
+# - Replace ObjectifyCallback
 # 
 # == Tests
 # - nesting of try stuff
 # + otherwise
 # + except
+# + -with_using
+# + $_ is used
+#
 # - assert
-# - -with_using
 # - $@ is always undef
-# - $_ is used
 
 #------------------------------------------------------------------------------
 package Error;
 
 use strict;
-use vars qw($VERSION);
-# use 5.004;
-
-$VERSION = "0.17015"; 
 
 use overload (
 	'""'	   =>	'stringify',
@@ -41,7 +42,7 @@ my %ERROR;		# Last error associated with package
 sub _throw_Error_Simple
 {
     my $args = shift;
-    return Error::Simple->new($args->{'text'});
+    return RuntimeError->new($args->{'text'});
 }
 
 $Error::ObjectifyCallback = \&_throw_Error_Simple;
@@ -155,6 +156,7 @@ sub new {
 	'-package' => $pkg,
 	'-file'    => $file,
 	'-line'    => $line,
+        ((@_ % 2) ? ('-text') : ()),
 	@_
     }, $self;
 
@@ -261,34 +263,6 @@ sub value {
     exists $self->{'-value'} ? $self->{'-value'} : undef;
 }
 
-package Error::Simple;
-
-@Error::Simple::ISA = qw(Error);
-
-sub new {
-    my $self  = shift;
-    my $text  = "" . shift;
-    my $value = shift;
-    my(@args) = ();
-
-    local $Error::Depth = $Error::Depth + 1;
-
-    @args = ( -file => $1, -line => $2)
-	if($text =~ s/\s+at\s+(\S+)\s+line\s+(\d+)(?:,\s*<[^>]*>\s+line\s+\d+)?\.?\n?$//s);
-    push(@args, '-value', 0 + $value)
-	if defined($value);
-
-    $self->SUPER::new(-text => $text, @args);
-}
-
-sub stringify {
-    my $self = shift;
-    my $text = $self->SUPER::stringify;
-    $text .= sprintf(" at %s line %d.\n", $self->file, $self->line)
-	unless($text =~ /\n$/s);
-    $text;
-}
-
 ##########################################################################
 ##########################################################################
 
@@ -332,6 +306,7 @@ sub run_clauses ($$$\@) {
 		    while(1) {
 			my $more = 0;
 			local($Error::THROWN, $@);
+                        $_ = $@ = $err;
 			my $ok = eval {
 			    $@ = $err;
 			    if($wantarray) {
@@ -367,6 +342,7 @@ sub run_clauses ($$$\@) {
 	    my $code = $clauses->{'otherwise'};
 	    my $more = 0;
         local($Error::THROWN, $@);
+            $_ = $@ = $err;
 	    my $ok = eval {
 		$@ = $err;
 		if($wantarray) {
@@ -392,7 +368,9 @@ sub run_clauses ($$$\@) {
 	    }
 	}
     }
-    $err;
+    undef $_;
+    undef $@;
+    return $err;
 }
 
 sub try (&;$) {
@@ -654,19 +632,6 @@ sub export_commands {
 {
     no warnings 'redefine';
     # This function is modified from Error.pm
-    sub Error::throw {
-        my $self = shift;
-        local $Error::Depth = $Error::Depth + 1;
-
-        # if we are not rethrow-ing then create the object to throw
-        unless (ref($self)) {
-            my %args;
-            $args{-text} = shift if @_;
-            $args{-value} = shift if @_;
-            $self = $self->new(%args);
-        }
-        die $Error::THROWN = $self;
-    }
 
     sub Error::subs::assert($$) {
         my ($value, $msg) = @_;
@@ -675,14 +640,11 @@ sub export_commands {
         return $value;
     }
 
-    # Eliminate Error::Simple usage
-    sub Error::Simple::new {
-        use Carp;
-        confess "Use 'Error' instead of 'Error::Simple'.";
-    }
-
     *Error::subs::using = \&Error::subs::with;
 }
+
+package RuntimeError;
+use base 'Error';
 
 1;
 
@@ -696,11 +658,18 @@ errors - Error Handling for Perl
 
 This module is still under design. Don't use it in production yet.
 
+A few things in this documentation are not yet implemented.
+
+NOTE: If you have suggestions as to how this module should behave, now
+      is a great time to contact the author.
+
 =head1 SYNOPSIS
 
     use strict;
     use warnings;
     use errors;
+
+    use errors -class => 'UncoolError';
 
     try {
         $cool = something();
@@ -713,10 +682,11 @@ This module is still under design. Don't use it in production yet.
         warn "$e";
     }
     catch UncoolError with {
-        # $@ is the same as $_[0]
-        warn "$@";
+        # $_ is the same as $_[0]
+        warn;
     }
-    except {
+    otherwise {
+        # $@ is the same as $_[0]
         warn "Some other error: $@";
     }
     finally {
@@ -873,12 +843,12 @@ NOTE: This is a major difference from Error.pm, which only allows a
 
 =item except { ... }
 
-This clause is invoked when there is an error from the C<try> block, but no
-C<catch> clauses were invoked.
+This clause returns a hash of error handlers, if no handler is found.
 
 =item otherwise { ... }
 
-This clause is invoked when no error occurs in the C<try> block.
+This clause is invoked when there is an error from the C<try> block, but no
+C<catch> clauses were invoked.
 
 =item finally { ... }
 
@@ -970,7 +940,7 @@ You can throw this in a stub subroutine.
 
 =item RuntimeError
 
-Indicates an unknown system error.
+Indicates an unknown error probably caused by a C<die> statement..
 
 =back
 

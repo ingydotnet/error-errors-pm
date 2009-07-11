@@ -11,8 +11,8 @@ try {
 catch Error with {
     my $e = shift;
     is ref($e), 'Error', '$e contains proper object';
-    is "$e", "Error 1", 'Stringify works';
-    is $e->text, 'Error 1', 'value() method works';
+    is "$@", "Error 1", 'Stringify works';
+    is $_->text, 'Error 1', 'value() method works';
 }
 except {
     fail 'Fail except 1';

@@ -1,4 +1,11 @@
 ---
+version: 0.03
+date:    Sat Jul 11 11:42:17 PDT 2009
+changes:
+- Inline Error module
+- Add many tests
+- Use $_ and $@ in blocks
+---
 version: 0.02
 date:    Thu Jul  9 13:05:49 PDT 2009
 changes:
