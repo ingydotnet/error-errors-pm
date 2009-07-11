@@ -11,6 +11,8 @@
 # - except
 # - assert
 # - -with_using
+# - $@ is always undef
+# - $_ is used
 package errors;
 use strict;
 use 5.008;
@@ -18,12 +20,37 @@ our $VERSION = '0.03';
 use Error 0.17015;
 use Error::Simple();
 
-# use XXX; $YAML::UseCode = 1;
+use XXX; $YAML::UseCode = 1;
 
 sub import {
-    my ($class, $arg1) = @_;
-    die "'use Errors' does not accept any arguments" if $arg1;
-    local $Exporter::ExportLevel += 1;
+    my ($class, $directive) = @_;
+    if (not $directive) {
+        $class->export_commands(
+            qw(try catch with except otherwise finally assert)
+        );
+    }
+    elsif ($directive eq '-with_using') {
+        $class->export_commands(
+            qw(try catch using except otherwise finally assert)
+        );
+    }
+    elsif ($directive eq '-class') {
+        my ($class, %fields) = @_[2..$#_];
+        my $isa = $fields{-isa} || 'Error';
+        no strict 'refs';
+        @{$class . '::ISA'} = ($isa);
+    }
+    else {
+        die "Invalid usage of errors module: 'use errors @_[1..$#_]'";
+    }
+}
+
+sub export_commands {
+    my ($class, @exports) = @_;
+    local @Error::subs::EXPORT_OK = @exports;
+    local %Error::subs::EXPORT_TAGS;
+    $Error::subs::EXPORT_TAGS{try} = \@exports;
+    local $Exporter::ExportLevel += 2;
     Error::subs->import(':try');
 }
 
@@ -36,19 +63,28 @@ sub import {
 
         # if we are not rethrow-ing then create the object to throw
         unless (ref($self)) {
-            my @args = @_;
-            if ($self eq 'Error') {
-                @args = (-text => $args[0], -value => $args[1]);
-            }
-            $self = $self->new(@args);
+            my %args;
+            $args{-text} = shift if @_;
+            $args{-value} = shift if @_;
+            $self = $self->new(%args);
         }
         die $Error::THROWN = $self;
     }
 
+    sub Error::subs::assert($$) {
+        my ($value, $msg) = @_;
+        die($msg) unless $value;
+#         throw Error($msg) unless $value;
+        return $value;
+    }
+
     # Eliminate Error::Simple usage
     sub Error::Simple::new {
-        die "Use 'Error' instead of 'Error::Simple'.";
+        use Carp;
+        confess "Use 'Error' instead of 'Error::Simple'.";
     }
+
+    *Error::subs::using = \&Error::subs::with;
 }
 
 1;

@@ -3,8 +3,6 @@ use strict;
 use warnings;
 use errors;
 
-#                 BEGIN {$| = 1}; use XXX;
-
 try {
     pass "Pass try 1";
     throw Error("Error 1");
