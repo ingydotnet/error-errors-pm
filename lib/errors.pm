@@ -644,7 +644,7 @@ sub export_commands {
 }
 
 package RuntimeError;
-use base 'Error';
+@RuntimeError::ISA = ('Error');
 
 1;
 
