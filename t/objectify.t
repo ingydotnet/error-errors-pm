@@ -5,7 +5,7 @@ use errors;
 try {
     die "Try dying";
 }
-catch Error with {
+catch Exception with {
     pass "Caught string error";
     is ref, 'RuntimeError', 'Unknown error becomes RuntimeError';
 };

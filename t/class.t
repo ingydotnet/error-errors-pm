@@ -24,7 +24,7 @@ catch FooError with {
     pass "Caught FooFooError";
     is ref($@), 'FooFooError', 'error is correct class';
     ok $@->isa('FooError'), 'error isa FooError';
-    ok $@->isa('Error'), 'error isa Error';
+    ok $@->isa('Exception'), 'error isa Exception';
     ok $@->can('throw'), 'error can throw';
 }
 except {

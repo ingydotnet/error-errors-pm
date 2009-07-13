@@ -5,12 +5,12 @@ use errors;
 
 try {
     pass "Pass try 1";
-    throw Error("Error 1");
+    throw Exception("Error 1");
     fail "Fail try 1";
 }
-catch Error with {
+catch Exception with {
     my $e = shift;
-    is ref($e), 'Error', '$e contains proper object';
+    is ref($e), 'Exception', '$e contains proper object';
     is "$@", "Error 1", 'Stringify works';
     is $_->text, 'Error 1', 'value() method works';
 }

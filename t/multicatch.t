@@ -11,7 +11,7 @@ try {
 catch Bar with {
     fail "catch incorrect error";
 }
-catch Error with {
+catch Exception with {
     pass "catch correct error";
     ok $_[0]->isa('Foo'), "It's a Foo!";
 }
