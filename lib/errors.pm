@@ -26,7 +26,7 @@
 package errors;
 use strict;
 use 5.008;
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 # use XXX; $YAML::UseCode = 1;
 
@@ -34,12 +34,12 @@ sub import {
     my ($class, $directive) = @_;
     if (not $directive) {
         $class->export_commands(
-            qw(try catch with except otherwise finally assert)
+            qw(try with except otherwise finally assert)
         );
     }
     elsif ($directive eq '-with_using') {
         $class->export_commands(
-            qw(try catch using except otherwise finally assert)
+            qw(try using except otherwise finally assert)
         );
     }
     elsif ($directive eq '-class') {
@@ -55,11 +55,9 @@ sub import {
 
 sub export_commands {
     my ($class, @exports) = @_;
-    local @Exception::subs::EXPORT_OK = @exports;
-    local %Exception::subs::EXPORT_TAGS;
-    $Exception::subs::EXPORT_TAGS{try} = \@exports;
+    local @errors::subs::EXPORT = @exports;
     local $Exporter::ExportLevel += 2;
-    Exception::subs->import(':try');
+    errors::subs->import();
 }
 
 #------------------------------------------------------------------------------
@@ -91,7 +89,7 @@ sub _throw_Error_Simple
 $Exception::ObjectifyCallback = \&_throw_Error_Simple;
 
 
-# Exported subs are defined in Exception::subs
+# Exported subs are defined in errors::subs
 
 use Scalar::Util ();
 
@@ -197,9 +195,9 @@ sub new {
 	my $text = defined($err->{'-text'}) ? $err->{'-text'} : "Exception";
 	my $trace = Carp::longmess($text);
 	# Remove try calls from the trace
-	$trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+Exception::subs::try[^\n]+(?=\n)//sog;
+	$trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
 	$trace =~
-        s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+Exception::subs::run_clauses[^\n]+\n\s+Exception::subs::try[^\n]+(?=\n)//sog;
+        s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::run_clauses[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
 	$err->{'-stacktrace'} = $trace
     }
 
@@ -295,15 +293,10 @@ sub value {
 # Inspired by code from Jesse Glick <jglick@sig.bsh.com> and
 # Peter Seibel <peter@weblogic.com>
 
-package Exception::subs;
+package errors::subs;
 
 use Exporter ();
-use vars qw(@EXPORT_OK @ISA %EXPORT_TAGS);
-
-@EXPORT_OK   = qw(try with finally except otherwise);
-%EXPORT_TAGS = (try => \@EXPORT_OK);
-
-@ISA = qw(Exporter);
+our @ISA = qw(Exporter);
 
 sub run_clauses ($$$\@) {
     my($clauses,$err,$wantarray,$result) = @_;
@@ -540,9 +533,9 @@ sub gen_callstack($)
     local $Carp::CarpLevel = $start;
     my $trace = Carp::longmess("");
     # Remove try calls from the trace
-    $trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+Exception::subs::try[^\n]+(?=\n)//sog;
+    $trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
     $trace =~
-    s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+Exception::subs::run_clauses[^\n]+\n\s+Exception::subs::try[^\n]+(?=\n)//sog;
+    s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::run_clauses[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
     my @callstack = split( m/\n/, $trace );
     return @callstack;
 }
