@@ -61,6 +61,240 @@ sub export_commands {
 }
 
 #------------------------------------------------------------------------------
+# Inspired by code from Jesse Glick and Peter Seibel
+
+package errors::subs;
+
+use Exporter ();
+our @ISA = qw(Exporter);
+
+sub objectify {
+    my $msg = shift;
+    return RuntimeError->new($msg);
+}
+
+sub run_clauses ($$$\@) {
+    my($clauses,$err,$wantarray,$result) = @_;
+    my $code = undef;
+
+    $err = objectify($err) unless ref($err);
+
+    CATCH: {
+
+	# catch
+	my $catch;
+	if(defined($catch = $clauses->{'catch'})) {
+	    my $i = 0;
+
+	    CATCHLOOP:
+	    for( ; $i < @$catch ; $i += 2) {
+		my $pkg = $catch->[$i];
+		unless(defined $pkg) {
+		    #except
+		    splice(@$catch,$i,2,$catch->[$i+1]->($err));
+		    $i -= 2;
+		    next CATCHLOOP;
+		}
+		elsif(Scalar::Util::blessed($err) && $err->isa($pkg)) {
+		    $code = $catch->[$i+1];
+		    while(1) {
+			my $more = 0;
+			local($Exception::THROWN, $@);
+                        $_ = $@ = $err;
+			my $ok = eval {
+			    $@ = $err;
+			    if($wantarray) {
+				@{$result} = $code->($err,\$more);
+			    }
+			    elsif(defined($wantarray)) {
+			        @{$result} = ();
+				$result->[0] = $code->($err,\$more);
+			    }
+			    else {
+				$code->($err,\$more);
+			    }
+			    1;
+			};
+			if( $ok ) {
+			    next CATCHLOOP if $more;
+			    undef $err;
+			}
+			else {
+			    $err = $@ || $Exception::THROWN;
+				$err = objectify($err)
+					unless ref($err);
+			}
+			last CATCH;
+		    };
+		}
+	    }
+	}
+
+	# otherwise
+	my $owise;
+	if(defined($owise = $clauses->{'otherwise'})) {
+	    my $code = $clauses->{'otherwise'};
+	    my $more = 0;
+        local($Exception::THROWN, $@);
+            $_ = $@ = $err;
+	    my $ok = eval {
+		$@ = $err;
+		if($wantarray) {
+		    @{$result} = $code->($err,\$more);
+		}
+		elsif(defined($wantarray)) {
+		    @{$result} = ();
+		    $result->[0] = $code->($err,\$more);
+		}
+		else {
+		    $code->($err,\$more);
+		}
+		1;
+	    };
+	    if( $ok ) {
+		undef $err;
+	    }
+	    else {
+		$err = $@ || $Exception::THROWN;
+
+		$err = objectify($err) 
+			unless ref($err);
+	    }
+	}
+    }
+    undef $_;
+    undef $@;
+    return $err;
+}
+
+sub try (&;$) {
+    my $try = shift;
+    my $clauses = @_ ? shift : {};
+    my $ok = 0;
+    my $err = undef;
+    my @result = ();
+
+    my $wantarray = wantarray();
+
+    do {
+	local $Exception::THROWN = undef;
+	local $@ = undef;
+
+	$ok = eval {
+	    if($wantarray) {
+		@result = $try->();
+	    }
+	    elsif(defined $wantarray) {
+		$result[0] = $try->();
+	    }
+	    else {
+		$try->();
+	    }
+	    1;
+	};
+
+	$err = $@ || $Exception::THROWN
+	    unless $ok;
+    };
+
+    $err = run_clauses($clauses,$err,wantarray,@result)
+    unless($ok);
+
+    $clauses->{'finally'}->()
+	if(defined($clauses->{'finally'}));
+
+    if (defined($err))
+    {
+        if (Scalar::Util::blessed($err) && $err->can('throw'))
+        {
+            throw $err;
+        }
+        else
+        {
+            die $err;
+        }
+    }
+
+    wantarray ? @result : $result[0];
+}
+
+# Each clause adds a sub to the list of clauses. The finally clause is
+# always the last, and the otherwise clause is always added just before
+# the finally clause.
+#
+# All clauses, except the finally clause, add a sub which takes one argument
+# this argument will be the error being thrown. The sub will return a code ref
+# if that clause can handle that error, otherwise undef is returned.
+#
+# The otherwise clause adds a sub which unconditionally returns the users
+# code reference, this is why it is forced to be last.
+#
+# The catch clause is defined in Exception.pm, as the syntax causes it to
+# be called as a method
+
+sub with (&;$) {
+    @_
+}
+
+sub using (&;$) {
+    @_
+}
+
+sub finally (&) {
+    my $code = shift;
+    my $clauses = { 'finally' => $code };
+    $clauses;
+}
+
+# The except clause is a block which returns a hashref or a list of
+# key-value pairs, where the keys are the classes and the values are subs.
+
+sub except (&;$) {
+    my $code = shift;
+    my $clauses = shift || {};
+    my $catch = $clauses->{'catch'} ||= [];
+    
+    my $sub = sub {
+	my $ref;
+	my(@array) = $code->($_[0]);
+	if(@array == 1 && ref($array[0])) {
+	    $ref = $array[0];
+	    $ref = [ %$ref ]
+		if(UNIVERSAL::isa($ref,'HASH'));
+	}
+	else {
+	    $ref = \@array;
+	}
+	@$ref
+    };
+
+    unshift @{$catch}, undef, $sub;
+
+    $clauses;
+}
+
+sub otherwise (&;$) {
+    my $code = shift;
+    my $clauses = shift || {};
+
+    if(exists $clauses->{'otherwise'}) {
+	require Carp;
+	Carp::croak("Multiple otherwise clauses");
+    }
+
+    $clauses->{'otherwise'} = $code;
+
+    $clauses;
+}
+
+sub assert($$) {
+    my ($value, $msg) = @_;
+    return $value if $value;
+    throw AssertionError($msg);
+    die($msg);
+}
+
+#------------------------------------------------------------------------------
 package Exception;
 
 use strict;
@@ -74,20 +308,10 @@ use overload (
 
 $Exception::Depth = 0;	# Depth to pass to caller()
 $Exception::Debug = 0;	# Generate verbose stack traces
-@Exception::STACK = ();	# Clause stack for try
 $Exception::THROWN = undef;	# last error thrown, a workaround until die $ref works
 
 my $LAST;		# Last error created
 my %ERROR;		# Last error associated with package
-
-sub _throw_Error_Simple
-{
-    my $args = shift;
-    return RuntimeError->new($args->{'text'});
-}
-
-$Exception::ObjectifyCallback = \&_throw_Error_Simple;
-
 
 # Exported subs are defined in errors::subs
 
@@ -216,28 +440,6 @@ sub throw {
     die $Exception::THROWN = $self;
 }
 
-# syntactic sugar for
-#
-#    die with Exception( ... );
-
-sub with {
-    my $self = shift;
-    local $Exception::Depth = $Exception::Depth + 1;
-
-    $self->new(@_);
-}
-
-# syntactic sugar for
-#
-#    record Exception( ... ) and return;
-
-sub record {
-    my $self = shift;
-    local $Exception::Depth = $Exception::Depth + 1;
-
-    $self->new(@_);
-}
-
 # catch clause for
 #
 # try { ... } catch CLASS with { ... }
@@ -287,339 +489,11 @@ sub value {
     exists $self->{'-value'} ? $self->{'-value'} : undef;
 }
 
-##########################################################################
-##########################################################################
-
-# Inspired by code from Jesse Glick <jglick@sig.bsh.com> and
-# Peter Seibel <peter@weblogic.com>
-
-package errors::subs;
-
-use Exporter ();
-our @ISA = qw(Exporter);
-
-sub run_clauses ($$$\@) {
-    my($clauses,$err,$wantarray,$result) = @_;
-    my $code = undef;
-
-    $err = $Exception::ObjectifyCallback->({'text' =>$err}) unless ref($err);
-
-    CATCH: {
-
-	# catch
-	my $catch;
-	if(defined($catch = $clauses->{'catch'})) {
-	    my $i = 0;
-
-	    CATCHLOOP:
-	    for( ; $i < @$catch ; $i += 2) {
-		my $pkg = $catch->[$i];
-		unless(defined $pkg) {
-		    #except
-		    splice(@$catch,$i,2,$catch->[$i+1]->($err));
-		    $i -= 2;
-		    next CATCHLOOP;
-		}
-		elsif(Scalar::Util::blessed($err) && $err->isa($pkg)) {
-		    $code = $catch->[$i+1];
-		    while(1) {
-			my $more = 0;
-			local($Exception::THROWN, $@);
-                        $_ = $@ = $err;
-			my $ok = eval {
-			    $@ = $err;
-			    if($wantarray) {
-				@{$result} = $code->($err,\$more);
-			    }
-			    elsif(defined($wantarray)) {
-			        @{$result} = ();
-				$result->[0] = $code->($err,\$more);
-			    }
-			    else {
-				$code->($err,\$more);
-			    }
-			    1;
-			};
-			if( $ok ) {
-			    next CATCHLOOP if $more;
-			    undef $err;
-			}
-			else {
-			    $err = $@ || $Exception::THROWN;
-				$err = $Exception::ObjectifyCallback->({'text' =>$err})
-					unless ref($err);
-			}
-			last CATCH;
-		    };
-		}
-	    }
-	}
-
-	# otherwise
-	my $owise;
-	if(defined($owise = $clauses->{'otherwise'})) {
-	    my $code = $clauses->{'otherwise'};
-	    my $more = 0;
-        local($Exception::THROWN, $@);
-            $_ = $@ = $err;
-	    my $ok = eval {
-		$@ = $err;
-		if($wantarray) {
-		    @{$result} = $code->($err,\$more);
-		}
-		elsif(defined($wantarray)) {
-		    @{$result} = ();
-		    $result->[0] = $code->($err,\$more);
-		}
-		else {
-		    $code->($err,\$more);
-		}
-		1;
-	    };
-	    if( $ok ) {
-		undef $err;
-	    }
-	    else {
-		$err = $@ || $Exception::THROWN;
-
-		$err = $Exception::ObjectifyCallback->({'text' =>$err}) 
-			unless ref($err);
-	    }
-	}
-    }
-    undef $_;
-    undef $@;
-    return $err;
-}
-
-sub try (&;$) {
-    my $try = shift;
-    my $clauses = @_ ? shift : {};
-    my $ok = 0;
-    my $err = undef;
-    my @result = ();
-
-    unshift @Exception::STACK, $clauses;
-
-    my $wantarray = wantarray();
-
-    do {
-	local $Exception::THROWN = undef;
-	local $@ = undef;
-
-	$ok = eval {
-	    if($wantarray) {
-		@result = $try->();
-	    }
-	    elsif(defined $wantarray) {
-		$result[0] = $try->();
-	    }
-	    else {
-		$try->();
-	    }
-	    1;
-	};
-
-	$err = $@ || $Exception::THROWN
-	    unless $ok;
-    };
-
-    shift @Exception::STACK;
-
-    $err = run_clauses($clauses,$err,wantarray,@result)
-    unless($ok);
-
-    $clauses->{'finally'}->()
-	if(defined($clauses->{'finally'}));
-
-    if (defined($err))
-    {
-        if (Scalar::Util::blessed($err) && $err->can('throw'))
-        {
-            throw $err;
-        }
-        else
-        {
-            die $err;
-        }
-    }
-
-    wantarray ? @result : $result[0];
-}
-
-# Each clause adds a sub to the list of clauses. The finally clause is
-# always the last, and the otherwise clause is always added just before
-# the finally clause.
-#
-# All clauses, except the finally clause, add a sub which takes one argument
-# this argument will be the error being thrown. The sub will return a code ref
-# if that clause can handle that error, otherwise undef is returned.
-#
-# The otherwise clause adds a sub which unconditionally returns the users
-# code reference, this is why it is forced to be last.
-#
-# The catch clause is defined in Exception.pm, as the syntax causes it to
-# be called as a method
-
-sub with (&;$) {
-    @_
-}
-
-sub using (&;$) {
-    @_
-}
-
-sub finally (&) {
-    my $code = shift;
-    my $clauses = { 'finally' => $code };
-    $clauses;
-}
-
-# The except clause is a block which returns a hashref or a list of
-# key-value pairs, where the keys are the classes and the values are subs.
-
-sub except (&;$) {
-    my $code = shift;
-    my $clauses = shift || {};
-    my $catch = $clauses->{'catch'} ||= [];
-    
-    my $sub = sub {
-	my $ref;
-	my(@array) = $code->($_[0]);
-	if(@array == 1 && ref($array[0])) {
-	    $ref = $array[0];
-	    $ref = [ %$ref ]
-		if(UNIVERSAL::isa($ref,'HASH'));
-	}
-	else {
-	    $ref = \@array;
-	}
-	@$ref
-    };
-
-    unshift @{$catch}, undef, $sub;
-
-    $clauses;
-}
-
-sub otherwise (&;$) {
-    my $code = shift;
-    my $clauses = shift || {};
-
-    if(exists $clauses->{'otherwise'}) {
-	require Carp;
-	Carp::croak("Multiple otherwise clauses");
-    }
-
-    $clauses->{'otherwise'} = $code;
-
-    $clauses;
-}
-
-sub assert($$) {
-    my ($value, $msg) = @_;
-    die($msg) unless $value;
-#         throw Exception($msg) unless $value;
-    return $value;
-}
-
-package Exception::WarnDie;
-
-sub gen_callstack($)
-{
-    my ( $start ) = @_;
-
-    require Carp;
-    local $Carp::CarpLevel = $start;
-    my $trace = Carp::longmess("");
-    # Remove try calls from the trace
-    $trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
-    $trace =~
-    s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::run_clauses[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
-    my @callstack = split( m/\n/, $trace );
-    return @callstack;
-}
-
-my $old_DIE;
-my $old_WARN;
-
-sub DEATH
-{
-    my ( $e ) = @_;
-
-    local $SIG{__DIE__} = $old_DIE if( defined $old_DIE );
-
-    die @_ if $^S;
-
-    my ( $etype, $message, $location, @callstack );
-    if ( ref($e) && $e->isa( "Exception" ) ) {
-        $etype = "exception of type " . ref( $e );
-        $message = $e->text;
-        $location = $e->file . ":" . $e->line;
-        @callstack = split( m/\n/, $e->stacktrace );
-    }
-    else {
-        # Don't apply subsequent layer of message formatting
-        die $e if( $e =~ m/^\nUnhandled perl error caught at toplevel:\n\n/ );
-        $etype = "perl error";
-        my $stackdepth = 0;
-        while( caller( $stackdepth ) =~ m/^Exception(?:$|::)/ ) {
-            $stackdepth++
-        }
-
-        @callstack = gen_callstack( $stackdepth + 1 );
-
-        $message = "$e";
-        chomp $message;
-
-        if ( $message =~ s/ at (.*?) line (\d+)\.$// ) {
-            $location = $1 . ":" . $2;
-        }
-        else {
-            my @caller = caller( $stackdepth );
-            $location = $caller[1] . ":" . $caller[2];
-        }
-    }
-
-    shift @callstack;
-    # Do it this way in case there are no elements; we don't print a spurious \n
-    my $callstack = join( "", map { "$_\n"} @callstack );
-
-    die "\nUnhandled $etype caught at toplevel:\n\n  $message\n\nThrown from: $location\n\nFull stack trace:\n\n$callstack\n";
-}
-
-sub TAXES
-{
-    my ( $message ) = @_;
-
-    local $SIG{__WARN__} = $old_WARN if( defined $old_WARN );
-
-    $message =~ s/ at .*? line \d+\.$//;
-    chomp $message;
-
-    my @callstack = gen_callstack( 1 );
-    my $location = shift @callstack;
-
-    # $location already starts in a leading space
-    $message .= $location;
-
-    # Do it this way in case there are no elements; we don't print a spurious \n
-    my $callstack = join( "", map { "$_\n"} @callstack );
-
-    warn "$message:\n$callstack";
-}
-
-sub import
-{
-    $old_DIE  = $SIG{__DIE__};
-    $old_WARN = $SIG{__WARN__};
-
-    $SIG{__DIE__}  = \&DEATH;
-    $SIG{__WARN__} = \&TAXES;
-}
-
 #------------------------------------------------------------------------------
 package RuntimeError;
+our @ISA = 'Exception';
+
+package AssertionError;
 our @ISA = 'Exception';
 
 1;
