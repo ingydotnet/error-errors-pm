@@ -1,4 +1,9 @@
 ---
+version: 0.05
+date:    Fri Jul 25 21:21:17 PDT 2014
+changes:
+- Make the pod be correct. From correct place.
+---
 version: 0.04
 date:    Fri Jul 25 08:34:48 PDT 2014
 changes:

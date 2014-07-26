@@ -1,7 +1,7 @@
 =meta: 0.0.1
 
 name: Error-errors
-version: 0.04
+version: 0.05
 abstract: Error Handling for Perl
 homepage: https://metacpan.org/release/Error-errors
 
@@ -22,6 +22,9 @@ devel:
   git: https://github.com/ingydotnet/error-errors-pm
   bug: https://github.com/ingydotnet/error-errors-pm/issues
   irc: irc.freenode.net#ingy
+
+=cpan:
+  libname: errors
 
 =travis:
   type: perl

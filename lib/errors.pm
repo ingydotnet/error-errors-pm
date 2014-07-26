@@ -25,7 +25,7 @@
 #------------------------------------------------------------------------------
 use strict; use strict;
 package errors;
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 sub import {
     my ($class, $directive) = @_;
