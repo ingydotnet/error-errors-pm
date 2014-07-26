@@ -76,7 +76,7 @@ prereqs:
 
 update: makefile
 	@echo '***** Updating/regenerating repo content'
-	make readme contrib travis version
+	make readme contrib travis version webhooks
 
 release: clean update check-release date test disttest
 	@echo '***** Releasing $(DISTDIR)'
@@ -154,6 +154,9 @@ clean purge:
 check-release:
 	@echo '***** Checking readiness to release $(DIST)'
 	RELEASE_BRANCH=$(RELEASE_BRANCH) zild-check-release
+	git stash
+	git pull --rebase origin $(RELEASE_BRANCH)
+	git stash pop
 
 # We don't want to update the Makefile in Zilla::Dist since it is the real
 # source, and would be reverting to whatever was installed.
@@ -176,3 +179,6 @@ date:
 
 version:
 	$(PERL) -S zild-version-update
+
+webhooks:
+	$(PERL) -S zild webhooks
