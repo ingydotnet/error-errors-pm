@@ -1,4 +1,9 @@
 ---
+version: 0.06
+date:    Wed Jul 30 15:41:28 PDT 2014
+changes:
+- Switch IRC to #pkg
+---
 version: 0.05
 date:    Fri Jul 25 21:21:17 PDT 2014
 changes:
