@@ -25,7 +25,7 @@
 #------------------------------------------------------------------------------
 use strict; use strict;
 package errors;
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 sub import {
     my ($class, $directive) = @_;
@@ -154,7 +154,7 @@ sub run_clauses ($$$\@) {
 	    else {
 		$err = $@ || $Exception::THROWN;
 
-		$err = objectify($err) 
+		$err = objectify($err)
 			unless ref($err);
 	    }
 	}
