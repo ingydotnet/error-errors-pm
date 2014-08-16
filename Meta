@@ -1,7 +1,7 @@
 =meta: 0.0.2
 
 name: Error-errors
-version: 0.11
+version: 0.12
 abstract: Error Handling for Perl
 homepage: https://metacpan.org/release/Error-errors
 language: perl

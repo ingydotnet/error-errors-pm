@@ -1,4 +1,4 @@
-# == ToDo
+#  ToDo
 # + Move Error.pm code into module
 # + 'with' clashes with Moose
 # + Remove Simple
@@ -23,9 +23,9 @@
 # - with becomes using if with already exists
 
 #------------------------------------------------------------------------------
-use strict; use strict;
+use strict; use warnings;
 package errors;
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 sub import {
     my ($class, $directive) = @_;
@@ -293,8 +293,6 @@ sub assert($$) {
 
 #------------------------------------------------------------------------------
 package Exception;
-
-use strict;
 
 use overload (
 	'""'	   =>	'stringify',
