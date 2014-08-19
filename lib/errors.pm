@@ -25,7 +25,7 @@
 #------------------------------------------------------------------------------
 use strict; use warnings;
 package errors;
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub import {
     my ($class, $directive) = @_;
@@ -78,86 +78,86 @@ sub run_clauses ($$$\@) {
 
     CATCH: {
 
-	# catch
-	my $catch;
-	if(defined($catch = $clauses->{'catch'})) {
-	    my $i = 0;
+        # catch
+        my $catch;
+        if(defined($catch = $clauses->{'catch'})) {
+            my $i = 0;
 
-	    CATCHLOOP:
-	    for( ; $i < @$catch ; $i += 2) {
-		my $pkg = $catch->[$i];
-		unless(defined $pkg) {
-		    #except
-		    splice(@$catch,$i,2,$catch->[$i+1]->($err));
-		    $i -= 2;
-		    next CATCHLOOP;
-		}
-		elsif(Scalar::Util::blessed($err) && $err->isa($pkg)) {
-		    $code = $catch->[$i+1];
-		    while(1) {
-			my $more = 0;
-			local($Exception::THROWN, $@);
+            CATCHLOOP:
+            for( ; $i < @$catch ; $i += 2) {
+                my $pkg = $catch->[$i];
+                unless(defined $pkg) {
+                    #except
+                    splice(@$catch,$i,2,$catch->[$i+1]->($err));
+                    $i -= 2;
+                    next CATCHLOOP;
+                }
+                elsif(Scalar::Util::blessed($err) && $err->isa($pkg)) {
+                    $code = $catch->[$i+1];
+                    while(1) {
+                        my $more = 0;
+                        local($Exception::THROWN, $@);
                         $_ = $@ = $err;
-			my $ok = eval {
-			    $@ = $err;
-			    if($wantarray) {
-				@{$result} = $code->($err,\$more);
-			    }
-			    elsif(defined($wantarray)) {
-			        @{$result} = ();
-				$result->[0] = $code->($err,\$more);
-			    }
-			    else {
-				$code->($err,\$more);
-			    }
-			    1;
-			};
-			if( $ok ) {
-			    next CATCHLOOP if $more;
-			    undef $err;
-			}
-			else {
-			    $err = $@ || $Exception::THROWN;
-				$err = objectify($err)
-					unless ref($err);
-			}
-			last CATCH;
-		    };
-		}
-	    }
-	}
+                        my $ok = eval {
+                            $@ = $err;
+                            if($wantarray) {
+                                @{$result} = $code->($err,\$more);
+                            }
+                            elsif(defined($wantarray)) {
+                                @{$result} = ();
+                                $result->[0] = $code->($err,\$more);
+                            }
+                            else {
+                                $code->($err,\$more);
+                            }
+                            1;
+                        };
+                        if( $ok ) {
+                            next CATCHLOOP if $more;
+                            undef $err;
+                        }
+                        else {
+                            $err = $@ || $Exception::THROWN;
+                                $err = objectify($err)
+                                        unless ref($err);
+                        }
+                        last CATCH;
+                    };
+                }
+            }
+        }
 
-	# otherwise
-	my $owise;
-	if(defined($owise = $clauses->{'otherwise'})) {
-	    my $code = $clauses->{'otherwise'};
-	    my $more = 0;
+        # otherwise
+        my $owise;
+        if(defined($owise = $clauses->{'otherwise'})) {
+            my $code = $clauses->{'otherwise'};
+            my $more = 0;
         local($Exception::THROWN, $@);
             $_ = $@ = $err;
-	    my $ok = eval {
-		$@ = $err;
-		if($wantarray) {
-		    @{$result} = $code->($err,\$more);
-		}
-		elsif(defined($wantarray)) {
-		    @{$result} = ();
-		    $result->[0] = $code->($err,\$more);
-		}
-		else {
-		    $code->($err,\$more);
-		}
-		1;
-	    };
-	    if( $ok ) {
-		undef $err;
-	    }
-	    else {
-		$err = $@ || $Exception::THROWN;
+            my $ok = eval {
+                $@ = $err;
+                if($wantarray) {
+                    @{$result} = $code->($err,\$more);
+                }
+                elsif(defined($wantarray)) {
+                    @{$result} = ();
+                    $result->[0] = $code->($err,\$more);
+                }
+                else {
+                    $code->($err,\$more);
+                }
+                1;
+            };
+            if( $ok ) {
+                undef $err;
+            }
+            else {
+                $err = $@ || $Exception::THROWN;
 
-		$err = objectify($err)
-			unless ref($err);
-	    }
-	}
+                $err = objectify($err)
+                        unless ref($err);
+            }
+        }
     }
     undef $_;
     undef $@;
@@ -174,31 +174,31 @@ sub try (&;$) {
     my $wantarray = wantarray();
 
     do {
-	local $Exception::THROWN = undef;
-	local $@ = undef;
+        local $Exception::THROWN = undef;
+        local $@ = undef;
 
-	$ok = eval {
-	    if($wantarray) {
-		@result = $try->();
-	    }
-	    elsif(defined $wantarray) {
-		$result[0] = $try->();
-	    }
-	    else {
-		$try->();
-	    }
-	    1;
-	};
+        $ok = eval {
+            if($wantarray) {
+                @result = $try->();
+            }
+            elsif(defined $wantarray) {
+                $result[0] = $try->();
+            }
+            else {
+                $try->();
+            }
+            1;
+        };
 
-	$err = $@ || $Exception::THROWN
-	    unless $ok;
+        $err = $@ || $Exception::THROWN
+            unless $ok;
     };
 
     $err = run_clauses($clauses,$err,wantarray,@result)
     unless($ok);
 
     $clauses->{'finally'}->()
-	if(defined($clauses->{'finally'}));
+        if(defined($clauses->{'finally'}));
 
     if (defined($err))
     {
@@ -252,17 +252,17 @@ sub except (&;$) {
     my $catch = $clauses->{'catch'} ||= [];
 
     my $sub = sub {
-	my $ref;
-	my(@array) = $code->($_[0]);
-	if(@array == 1 && ref($array[0])) {
-	    $ref = $array[0];
-	    $ref = [ %$ref ]
-		if(UNIVERSAL::isa($ref,'HASH'));
-	}
-	else {
-	    $ref = \@array;
-	}
-	@$ref
+        my $ref;
+        my(@array) = $code->($_[0]);
+        if(@array == 1 && ref($array[0])) {
+            $ref = $array[0];
+            $ref = [ %$ref ]
+                if(UNIVERSAL::isa($ref,'HASH'));
+        }
+        else {
+            $ref = \@array;
+        }
+        @$ref
     };
 
     unshift @{$catch}, undef, $sub;
@@ -275,8 +275,8 @@ sub otherwise (&;$) {
     my $clauses = shift || {};
 
     if(exists $clauses->{'otherwise'}) {
-	require Carp;
-	Carp::croak("Multiple otherwise clauses");
+        require Carp;
+        Carp::croak("Multiple otherwise clauses");
     }
 
     $clauses->{'otherwise'} = $code;
@@ -295,18 +295,18 @@ sub assert($$) {
 package Exception;
 
 use overload (
-	'""'	   =>	'stringify',
-	'0+'	   =>	'value',
-	'bool'     =>	sub { return 1; },
-	'fallback' =>	1
+        '""'       => 'stringify',
+        '0+'       => 'value',
+        'bool'     => sub { return 1; },
+        'fallback' => 1
 );
 
-$Exception::Depth = 0;	# Depth to pass to caller()
-$Exception::Debug = 0;	# Generate verbose stack traces
-$Exception::THROWN = undef;	# last error thrown, a workaround until die $ref works
+$Exception::Depth = 0;        # Depth to pass to caller()
+$Exception::Debug = 0;        # Generate verbose stack traces
+$Exception::THROWN = undef;   # last error thrown, a workaround until die $ref works
 
-my $LAST;		# Last error created
-my %ERROR;		# Last error associated with package
+my $LAST;                # Last error created
+my %ERROR;               # Last error associated with package
 
 # Exported subs are defined in errors::subs
 
@@ -322,17 +322,17 @@ sub prior {
 
     my $pkg = shift;
     return exists $ERROR{$pkg} ? $ERROR{$pkg} : undef
-	unless ref($pkg);
+        unless ref($pkg);
 
     my $obj = $pkg;
     my $err = undef;
     if($obj->isa('HASH')) {
-	$err = $obj->{'__Error__'}
-	    if exists $obj->{'__Error__'};
+        $err = $obj->{'__Error__'}
+            if exists $obj->{'__Error__'};
     }
     elsif($obj->isa('GLOB')) {
-	$err = ${*$obj}{'__Error__'}
-	    if exists ${*$obj}{'__Error__'};
+        $err = ${*$obj}{'__Error__'}
+            if exists ${*$obj}{'__Error__'};
     }
 
     $err;
@@ -360,12 +360,12 @@ sub stacktrace {
     my $self = shift;
 
     return $self->{'-stacktrace'}
-	if exists $self->{'-stacktrace'};
+        if exists $self->{'-stacktrace'};
 
     my $text = exists $self->{'-text'} ? $self->{'-text'} : "Died";
 
     $text .= sprintf(" at %s line %d.\n", $self->file, $self->line)
-	unless($text =~ /\n$/s);
+        unless($text =~ /\n$/s);
 
     $text;
 }
@@ -378,10 +378,10 @@ sub associate {
     return unless ref($obj);
 
     if($obj->isa('HASH')) {
-	$obj->{'__Error__'} = $err;
+        $obj->{'__Error__'} = $err;
     }
     elsif($obj->isa('GLOB')) {
-	${*$obj}{'__Error__'} = $err;
+        ${*$obj}{'__Error__'} = $err;
     }
     $obj = ref($obj);
     $ERROR{ ref($obj) } = $err;
@@ -395,29 +395,29 @@ sub new {
     my($pkg,$file,$line) = caller($Exception::Depth);
 
     my $err = bless {
-	'-package' => $pkg,
-	'-file'    => $file,
-	'-line'    => $line,
+        '-package' => $pkg,
+        '-file'    => $file,
+        '-line'    => $line,
         ((@_ % 2) ? ('-text') : ()),
-	@_
+        @_
     }, $self;
 
     $err->associate($err->{'-object'})
-	if(exists $err->{'-object'});
+        if(exists $err->{'-object'});
 
     # To always create a stacktrace would be very inefficient, so
     # we only do it if $Exception::Debug is set
 
     if($Exception::Debug) {
-	require Carp;
-	local $Carp::CarpLevel = $Exception::Depth;
-	my $text = defined($err->{'-text'}) ? $err->{'-text'} : "Exception";
-	my $trace = Carp::longmess($text);
-	# Remove try calls from the trace
-	$trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
-	$trace =~
+        require Carp;
+        local $Carp::CarpLevel = $Exception::Depth;
+        my $text = defined($err->{'-text'}) ? $err->{'-text'} : "Exception";
+        my $trace = Carp::longmess($text);
+        # Remove try calls from the trace
+        $trace =~ s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
+        $trace =~
         s/(\n\s+\S+__ANON__[^\n]+)?\n\s+eval[^\n]+\n\s+errors::subs::run_clauses[^\n]+\n\s+errors::subs::try[^\n]+(?=\n)//sog;
-	$err->{'-stacktrace'} = $trace
+        $err->{'-stacktrace'} = $trace
     }
 
     $@ = $LAST = $ERROR{$pkg} = $err;
